@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 
+__all__ = ["SPD", "SPDConv", "SPDConv2"]
 
-__all__ = ['SPDConv', 'SPD', 'SPDConv2']
+
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
     if d > 1:
@@ -122,8 +123,9 @@ class Conv2(Conv):
         self.__delattr__("cv2")
         self.forward = self.forward_fuse
 
+
 class SPDConv(nn.Module):
-    def __init__(self, c1, c2,k=1,s=1 ,p=None ,g=1, d=1,act=True):
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__()
         self.d = d
         self.out = c2
@@ -136,14 +138,16 @@ class SPDConv(nn.Module):
 
 
 class SPD(nn.Module):
-     def __init__(self, c1, c2=None, d=1):
-         super().__init__()
-         self.d = d
-         self.c1 = c1
-         self.c2 = c1 * 4
+    def __init__(self, c1, c2=None, d=1):
+        super().__init__()
+        self.d = d
+        self.c1 = c1
+        self.c2 = c1 * 4
 
-     def forward(self, x):
-         return torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)
+    def forward(self, x):
+        return torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)
+
+
 #         size_tensor = x.size()
 #         return torch.cat([x[...,0:size_tensor[2]//2,0:size_tensor[3]//2],
 #                          x[...,0:size_tensor[2]//2,size_tensor[3]//2:],
@@ -152,9 +156,8 @@ class SPD(nn.Module):
 
 
 class SPD9(nn.Module):
-    """
+    """"""
 
-    """
     def __init__(self, c1, c2=None, d=1):
         super().__init__()
         self.d = d
@@ -165,33 +168,29 @@ class SPD9(nn.Module):
 
     def forward(self, x):
 
-        B, C, ori_H, ori_W = x.size()
+        _B, _C, ori_H, ori_W = x.size()
 
         target_h = ori_H // 2
         target_w = ori_W // 2
 
-
         pad_top = self.kernel_size // 2
         pad_left = self.kernel_size // 2
 
-
         x = nn.ConstantPad2d((pad_left, 0, pad_top, 0), 0.0)(x)
 
-        x00 = x[..., 0::self.step, 0::self.step]
-        x01 = x[..., 0::self.step, 1::self.step]
-        x02 = x[..., 0::self.step, 2::self.step]
-        x10 = x[..., 1::self.step, 0::self.step]
-        x11 = x[..., 1::self.step, 1::self.step]
-        x12 = x[..., 1::self.step, 2::self.step]
-        x20 = x[..., 2::self.step, 0::self.step]
-        x21 = x[..., 2::self.step, 1::self.step]
-        x22 = x[..., 2::self.step, 2::self.step]
-
+        x00 = x[..., 0 :: self.step, 0 :: self.step]
+        x01 = x[..., 0 :: self.step, 1 :: self.step]
+        x02 = x[..., 0 :: self.step, 2 :: self.step]
+        x10 = x[..., 1 :: self.step, 0 :: self.step]
+        x11 = x[..., 1 :: self.step, 1 :: self.step]
+        x12 = x[..., 1 :: self.step, 2 :: self.step]
+        x20 = x[..., 2 :: self.step, 0 :: self.step]
+        x21 = x[..., 2 :: self.step, 1 :: self.step]
+        x22 = x[..., 2 :: self.step, 2 :: self.step]
 
         grids = [x00, x01, x02, x10, x11, x12, x20, x21, x22]
         unified_grids = []
         for grid in grids:
-
             crop_h = min(grid.shape[2], target_h)
             crop_w = min(grid.shape[3], target_w)
             grid_cropped = grid[..., :crop_h, :crop_w]
@@ -200,8 +199,8 @@ class SPD9(nn.Module):
         x = torch.cat(unified_grids, dim=1)
         return x
 
-class SPDConv2(nn.Module):
 
+class SPDConv2(nn.Module):
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__()
         self.d = d
@@ -214,18 +213,18 @@ class SPDConv2(nn.Module):
         ori_h, ori_w = x.shape[2], x.shape[3]
         x = self.spd9(x)
         x = self.conv(x)
-        assert x.shape[2] <= ori_h//2 and x.shape[3] <= ori_w//2, \
-            f"输出尺寸{x.shape[2:]}超过原始半尺寸({ori_h//2}, {ori_w//2})"
+        assert x.shape[2] <= ori_h // 2 and x.shape[3] <= ori_w // 2, (
+            f"输出尺寸{x.shape[2:]}超过原始半尺寸({ori_h // 2}, {ori_w // 2})"
+        )
         return x
 
-if __name__ == '__main__':
 
-
+if __name__ == "__main__":
     image_size = (1, 13, 240, 240)
     image = torch.rand(*image_size)
 
     # Model
-    test = SPDConv(13, 33,k=3,s=2)
+    test = SPDConv(13, 33, k=3, s=2)
 
     out = test(image)
     print(out.size())

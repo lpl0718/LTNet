@@ -145,12 +145,11 @@ def bbox_iou(
                 return iou - rho2 / c2  # DIoU
 
             else:
-                rho_w2 = ((b2_x2 - b2_x1) - (b1_x2-b1_x1)).pow(2)
-                rho_h2 = ((b2_y2 - b2_y1) - (b1_y2-b1_y1)).pow(2)
+                rho_w2 = ((b2_x2 - b2_x1) - (b1_x2 - b1_x1)).pow(2)
+                rho_h2 = ((b2_y2 - b2_y1) - (b1_y2 - b1_y1)).pow(2)
                 cw2 = cw.pow(2) + eps
                 ch2 = ch.pow(2) + eps
-                return iou - (rho2 / c2 +rho_w2 / cw2 + rho_h2 / ch2)
-
+                return iou - (rho2 / c2 + rho_w2 / cw2 + rho_h2 / ch2)
 
         c_area = cw * ch + eps  # convex area
         return iou - (c_area - union) / c_area  # GIoU https://arxiv.org/pdf/1902.09630.pdf
@@ -1573,18 +1572,19 @@ class OBBMetrics(DetMetrics):
         # TODO: probably remove task as well
         self.task = "obb"
 
-def wasserstein_loss(pred, target, eps=1e-7, constant=12.8):  #12.8
-    r"""Implementation of paper Enhancing Geometric Factors into               #NWDloss
-    Model Learning and Inference for Object Detection and Instance
-    Segmentation https://arxiv.org/abs/2005.03572`_.
-    Code is modified from https://github.com/Zzh-tju/CIoU.
-Args:
-        pred (Tensor): Predicted bboxes of format (x_min, y_min, x_max, y_max),
-            shape (n, 4).
+
+def wasserstein_loss(pred, target, eps=1e-7, constant=12.8):  # 12.8
+    r"""Implementation of paper Enhancing Geometric Factors into #NWDloss Model Learning and Inference for Object
+    Detection and Instance Segmentation https://arxiv.org/abs/2005.03572`_. Code is modified
+    from https://github.com/Zzh-tju/CIoU.
+
+    Args:
+        pred (Tensor): Predicted bboxes of format (x_min, y_min, x_max, y_max), shape (n, 4).
         target (Tensor): Corresponding gt bboxes, shape (n, 4).
         eps (float): Eps to avoid log(0).
-Return:
-<Tensor: Loss tensor.>
+
+    Returns:
+        <Tensor: Loss tensor.>.
     """
     b1_x1, b1_y1, b1_x2, b1_y2 = pred.chunk(4, -1)
     b2_x1, b2_y1, b2_x2, b2_y2 = target.chunk(4, -1)
@@ -1596,5 +1596,3 @@ Return:
     wh_distance = ((w1 - w2) ** 2 + (h1 - h2) ** 2) / 4
     wasserstein_2 = center_distance + wh_distance
     return torch.exp(-torch.sqrt(wasserstein_2) / constant)
-
-

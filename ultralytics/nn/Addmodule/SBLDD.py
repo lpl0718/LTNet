@@ -1,9 +1,9 @@
+import sys
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 
-
-import sys
-from pathlib import Path
 # 自动加入根路径，永远不炸
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
@@ -11,11 +11,12 @@ sys.path.insert(0, str(current_dir.parent.parent.parent))
 
 # 永远不报错的导入
 try:
-    from .SPDConv import SPDConv2, SPDConv, SPD
+    from .SPDConv import SPDConv
 except:
-    from SPDConv import SPDConv2, SPDConv, SPD
+    from SPDConv import SPDConv
 
 from ultralytics.nn.modules import DWConv
+
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
@@ -25,8 +26,10 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
 
+
 class Conv(nn.Module):
     """Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)."""
+
     default_act = nn.SiLU()  # default activation
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
@@ -165,60 +168,51 @@ class Conv(nn.Module):
 #         return out
 
 
-#双分支并行下采样模块（Dual-Branch Parallel Downsampling, DBPD）
+# 双分支并行下采样模块（Dual-Branch Parallel Downsampling, DBPD）
 class DBPD3(nn.Module):
-
-    def __init__(self, c1,c2):
+    def __init__(self, c1, c2):
         super().__init__()
 
-
-        self.dwconv = DWConv(c1, c1,3,1)
-        self.spdconv = SPDConv(c1,2*c1)
-        self.conv = Conv(c1,c1,3,2)
-
+        self.dwconv = DWConv(c1, c1, 3, 1)
+        self.spdconv = SPDConv(c1, 2 * c1)
+        self.conv = Conv(c1, c1, 3, 2)
 
     def forward(self, x):
         y0 = self.dwconv(x)
         y0 = self.spdconv(y0)
         y1 = self.conv(x)
-        return torch.cat([y0,y1],dim=1)
+        return torch.cat([y0, y1], dim=1)
 
-#双分支并行下采样模块（Dual-Branch Parallel Downsampling, DBPD）
+
+# 双分支并行下采样模块（Dual-Branch Parallel Downsampling, DBPD）
 class DBPD2(nn.Module):
-
-    def __init__(self, c1,c2):
+    def __init__(self, c1, c2):
         super().__init__()
 
-
-        self.conv = Conv(c1, c1,3,2)
-        self.avgpool = nn.AvgPool2d(3,2,1)
+        self.conv = Conv(c1, c1, 3, 2)
+        self.avgpool = nn.AvgPool2d(3, 2, 1)
         self.bn = nn.BatchNorm2d(c1)
         self.act = nn.SiLU()
-
 
     def forward(self, x):
         y0 = self.conv(x)
         y1 = self.avgpool(x)
         y1 = self.bn(y1)
         y1 = self.act(y1)
-        return torch.cat([y0,y1],dim=1)
+        return torch.cat([y0, y1], dim=1)
 
     def forward_fuse(self, x):
         """Perform transposed convolution of 2D data."""
         y0 = self.conv(x)
         y1 = self.avgpool(x)
         y1 = self.act(y1)
-        return torch.cat([y0,y1],dim=1)
+        return torch.cat([y0, y1], dim=1)
 
 
-
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     input = torch.randn(2, 8, 320, 320)
-    dbpd = DBPD2(8,16)
-    tbpd = DBPD3(8,24)
+    dbpd = DBPD2(8, 16)
+    tbpd = DBPD3(8, 24)
     output1 = dbpd(input)
 
     print(output1.size())
