@@ -1,8 +1,8 @@
-from torch import nn
-from einops import rearrange
 import torch
+from einops import rearrange
+from torch import nn
 
-__all__ = ['C3k2_RFAConv', 'RFAConv']
+__all__ = ["C3k2_RFAConv", "RFAConv"]
 
 
 class RFAConv(nn.Module):
@@ -10,14 +10,23 @@ class RFAConv(nn.Module):
         super().__init__()
         self.kernel_size = kernel_size
 
-        self.get_weight = nn.Sequential(nn.AvgPool2d(kernel_size=kernel_size, padding=kernel_size // 2, stride=stride),
-                                        nn.Conv2d(in_channel, in_channel * (kernel_size ** 2), kernel_size=1,
-                                                  groups=in_channel, bias=False))
+        self.get_weight = nn.Sequential(
+            nn.AvgPool2d(kernel_size=kernel_size, padding=kernel_size // 2, stride=stride),
+            nn.Conv2d(in_channel, in_channel * (kernel_size**2), kernel_size=1, groups=in_channel, bias=False),
+        )
         self.generate_feature = nn.Sequential(
-            nn.Conv2d(in_channel, in_channel * (kernel_size ** 2), kernel_size=kernel_size, padding=kernel_size // 2,
-                      stride=stride, groups=in_channel, bias=False),
-            nn.BatchNorm2d(in_channel * (kernel_size ** 2)),
-            nn.ReLU())
+            nn.Conv2d(
+                in_channel,
+                in_channel * (kernel_size**2),
+                kernel_size=kernel_size,
+                padding=kernel_size // 2,
+                stride=stride,
+                groups=in_channel,
+                bias=False,
+            ),
+            nn.BatchNorm2d(in_channel * (kernel_size**2)),
+            nn.ReLU(),
+        )
 
         self.conv = Conv(in_channel, out_channel, k=kernel_size, s=kernel_size, p=0)
 
@@ -25,13 +34,16 @@ class RFAConv(nn.Module):
         b, c = x.shape[0:2]
         weight = self.get_weight(x)
         h, w = weight.shape[2:]
-        weighted = weight.view(b, c, self.kernel_size ** 2, h, w).softmax(2)  # b c*kernel**2,h,w ->  b c k**2 h w
-        feature = self.generate_feature(x).view(b, c, self.kernel_size ** 2, h,
-                                                w)  # b c*kernel**2,h,w ->  b c k**2 h w
+        weighted = weight.view(b, c, self.kernel_size**2, h, w).softmax(2)  # b c*kernel**2,h,w ->  b c k**2 h w
+        feature = self.generate_feature(x).view(b, c, self.kernel_size**2, h, w)  # b c*kernel**2,h,w ->  b c k**2 h w
         weighted_data = feature * weighted
-        conv_data = rearrange(weighted_data, 'b c (n1 n2) h w -> b c (h n1) (w n2)', n1=self.kernel_size,
-                              # b c k**2 h w ->  b c h*k w*k
-                              n2=self.kernel_size)
+        conv_data = rearrange(
+            weighted_data,
+            "b c (n1 n2) h w -> b c (h n1) (w n2)",
+            n1=self.kernel_size,
+            # b c k**2 h w ->  b c h*k w*k
+            n2=self.kernel_size,
+        )
         return self.conv(conv_data)
 
 
@@ -46,6 +58,7 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
 
 class Conv(nn.Module):
     """Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)."""
+
     default_act = nn.SiLU()  # default activation
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
@@ -105,6 +118,7 @@ class C2f(nn.Module):
         y.extend(m(y[-1]) for m in self.m)
         return self.cv2(torch.cat(y, 1))
 
+
 class C3(nn.Module):
     """CSP Bottleneck with 3 convolutions."""
 
@@ -121,6 +135,7 @@ class C3(nn.Module):
         """Forward pass through the CSP bottleneck with 2 convolutions."""
         return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), 1))
 
+
 class C3k(C3):
     """C3k is a CSP bottleneck module with customizable kernel sizes for feature extraction in neural networks."""
 
@@ -131,6 +146,7 @@ class C3k(C3):
         # self.m = nn.Sequential(*(RepBottleneck(c_, c_, shortcut, g, k=(k, k), e=1.0) for _ in range(n)))
         self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, k=(k, k), e=1.0) for _ in range(n)))
 
+
 class C3k2_RFAConv(C2f):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
 
@@ -140,6 +156,7 @@ class C3k2_RFAConv(C2f):
         self.m = nn.ModuleList(
             C3k(self.c, self.c, 2, shortcut, g) if c3k else Bottleneck(self.c, self.c, shortcut, g) for _ in range(n)
         )
+
 
 if __name__ == "__main__":
     # Generating Sample image

@@ -26,8 +26,7 @@ __all__ = (
     "SpatialAttention",
 )
 
-from humanfriendly.terminal import \
-    output
+from humanfriendly.terminal import output
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -67,10 +66,10 @@ class Conv(nn.Module):
         super().__init__()
         self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False)
         self.bn = nn.BatchNorm2d(c2)
- 
-        if act == 'gelu':
+
+        if act == "gelu":
             self.act = nn.GELU()
-            print("GELU activation used")  
+            print("GELU activation used")
         else:
             self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
 
@@ -676,10 +675,11 @@ class Index(nn.Module):
         """
         return x[self.index]
 
-if __name__ == '__main__':
-        input = torch.randn(1, 256, 40, 40)
 
-        dw=DWConv(256,512,3)
+if __name__ == "__main__":
+    input = torch.randn(1, 256, 40, 40)
 
-        output=dw(input)
-        print(output.size())
+    dw = DWConv(256, 512, 3)
+
+    output = dw(input)
+    print(output.size())

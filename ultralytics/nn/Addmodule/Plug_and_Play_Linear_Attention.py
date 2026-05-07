@@ -1,24 +1,23 @@
 import math
 import time
+
 import torch
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange  # 用于便捷地重排张量维度
 
 # https://arxiv.org/pdf/2506.08520
 
+
 def closest_square_factors(N):
-    """
-    寻找最接近的两个因数(r, c)，使得r*c = N且|r-c|最小
-    用途：将landmark数量分解为近似正方形的网格尺寸，便于后续池化操作
+    """寻找最接近的两个因数(r, c)，使得r*c = N且|r-c|最小 用途：将landmark数量分解为近似正方形的网格尺寸，便于后续池化操作.
 
     参数:
         N: 需要分解的整数（landmark数量）
     返回:
         (r, c): 满足r*c=N且最接近正方形的两个因数
     """
-    s = int(math.isqrt(N))  # 取N的平方根的整数部分（向下取整）
+    s = math.isqrt(N)  # 取N的平方根的整数部分（向下取整）
     # 从平方根开始向下寻找能整除N的最大因数
     for i in range(s, 0, -1):
         if N % i == 0:
@@ -26,9 +25,7 @@ def closest_square_factors(N):
 
 
 class ExpLinearAfterThreshold(nn.Module):
-    """
-    自定义激活函数：阈值以下使用指数函数，阈值以上使用线性函数
-    设计目的：平衡非线性表达能力与梯度稳定性，避免指数函数在大值区域的梯度爆炸
+    """自定义激活函数：阈值以下使用指数函数，阈值以上使用线性函数 设计目的：平衡非线性表达能力与梯度稳定性，避免指数函数在大值区域的梯度爆炸.
 
     参数:
         max_val: 阈值，小于等于该值使用指数函数，大于该值使用线性函数
@@ -47,9 +44,7 @@ class ExpLinearAfterThreshold(nn.Module):
 
 
 class PnPNystraAttention(nn.Module):
-    r""" 基于PNP-Nyström方法的注意力模块
-    核心思想：使用少量"landmark"（地标点）近似计算注意力矩阵，将复杂度从O(N²)降至O(NM)
-    支持四维输入输出（B, C, H, W），适用于图像等视觉任务
+    r"""基于PNP-Nyström方法的注意力模块 核心思想：使用少量"landmark"（地标点）近似计算注意力矩阵，将复杂度从O(N²)降至O(NM) 支持四维输入输出（B, C, H, W），适用于图像等视觉任务.
 
     参数:
         dim: 输入特征的通道维度
@@ -62,13 +57,15 @@ class PnPNystraAttention(nn.Module):
         proj_drop: 输出投影层的dropout概率
     """
 
-    def __init__(self, dim, num_heads=4, num_landmarks=64, iters=6, qkv_bias=True, qk_scale=None, attn_drop=0., proj_drop=0.):
+    def __init__(
+        self, dim, num_heads=4, num_landmarks=64, iters=6, qkv_bias=True, qk_scale=None, attn_drop=0.0, proj_drop=0.0
+    ):
         super().__init__()
         self.dim = dim  # 输入特征维度（通道数）
         self.num_heads = num_heads  # 注意力头数量
         self.head_dim = dim // num_heads  # 每个注意力头的维度（总维度/头数）
         # 缩放因子：用于调节QK相似度的数值范围，避免softmax梯度消失
-        self.scale = qk_scale or self.head_dim ** -0.5
+        self.scale = qk_scale or self.head_dim**-0.5
 
         # QKV生成：通过一个线性层同时生成查询（Q）、键（K）、值（V）
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
@@ -76,15 +73,13 @@ class PnPNystraAttention(nn.Module):
         self.proj = nn.Linear(dim, dim)  # 输出投影层：将多头特征聚合回原维度
         self.proj_drop = nn.Dropout(proj_drop)  # 输出的dropout
 
-        self.activ = ExpLinearAfterThreshold()  # 自定义激活函数实例
+        self.active = ExpLinearAfterThreshold()  # 自定义激活函数实例
 
         self.num_landmarks = num_landmarks  # 地标点数量（M）
         self.iters = iters  # Moore-Penrose伪逆的迭代次数
 
     def moore_penrose_iter_pinv(self, x, iters=6):
-        """
-        迭代计算矩阵的Moore-Penrose伪逆（广义逆）
-        用途：在Nyström近似中求解低秩矩阵的逆，比直接求逆更高效、稳定
+        """迭代计算矩阵的Moore-Penrose伪逆（广义逆） 用途：在Nyström近似中求解低秩矩阵的逆，比直接求逆更高效、稳定.
 
         参数:
             x: 输入矩阵，形状为(..., M, M)（M为landmark数量）
@@ -99,11 +94,11 @@ class PnPNystraAttention(nn.Module):
         col_sum = abs_x.sum(dim=-1)  # 列方向求和（每行的L1范数）
         row_sum = abs_x.sum(dim=-2)  # 行方向求和（每列的L1范数）
         # 初始近似值：转置矩阵除以最大行列范数的乘积（缩放以保证数值稳定）
-        z = rearrange(x, '... i j -> ... j i') / (torch.max(col_sum) * torch.max(row_sum) + 1e-15)
+        z = rearrange(x, "... i j -> ... j i") / (torch.max(col_sum) * torch.max(row_sum) + 1e-15)
 
         # 创建单位矩阵（与x的最后两个维度匹配）
         I = torch.eye(x.shape[-1], device=device)
-        I = rearrange(I, 'i j -> () i j')  # 增加维度以匹配批量维度
+        I = rearrange(I, "i j -> () i j")  # 增加维度以匹配批量维度
 
         # 迭代更新伪逆（基于牛顿迭代法的变体）
         for _ in range(iters):
@@ -118,7 +113,7 @@ class PnPNystraAttention(nn.Module):
         N = H * W
         head_dim = self.head_dim
 
-        x_flat = rearrange(x, 'b c h w -> b (h w) c')
+        x_flat = rearrange(x, "b c h w -> b (h w) c")
         qkv = self.qkv(x_flat).reshape(B, N, 3, self.num_heads, head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
         q = q * self.scale
@@ -145,13 +140,13 @@ class PnPNystraAttention(nn.Module):
             F.pad(q_reshaped, (pad_w, pad_w, pad_h, pad_h)),  # 先padding再池化
             kernel_size=(kernel_h, kernel_w),
             stride=(stride_h, stride_w),
-            ceil_mode=False  # 禁用向上取整，保证确定性
+            ceil_mode=False,  # 禁用向上取整，保证确定性
         )
         k_m = F.avg_pool2d(
             F.pad(k_reshaped, (pad_w, pad_w, pad_h, pad_h)),
             kernel_size=(kernel_h, kernel_w),
             stride=(stride_h, stride_w),
-            ceil_mode=False
+            ceil_mode=False,
         )
         # -------------------------------------------------------------
 
@@ -163,16 +158,16 @@ class PnPNystraAttention(nn.Module):
         k_m = k_m.permute(0, 2, 3, 1).reshape(B, self.num_heads, self.num_landmarks, head_dim)
 
         # 后续代码不变
-        temp = self.activ(q_m @ k_m.transpose(-2, -1))
+        temp = self.active(q_m @ k_m.transpose(-2, -1))
         pseudo_inv = self.moore_penrose_iter_pinv(temp, self.iters)
-        prod = (self.activ(q @ k_m.transpose(-2, -1)) @ pseudo_inv) @ (
-                self.activ(q_m @ k.transpose(-2, -1)) @ torch.cat([v, torch.ones_like(v[..., :1])], dim=-1)
+        prod = (self.active(q @ k_m.transpose(-2, -1)) @ pseudo_inv) @ (
+            self.active(q_m @ k.transpose(-2, -1)) @ torch.cat([v, torch.ones_like(v[..., :1])], dim=-1)
         )
 
         x_out = (prod[..., :-1] / (prod[..., -1].unsqueeze(-1) + 1e-12)).transpose(1, 2).reshape(B, N, C)
         x_out = self.proj(x_out)
         x_out = self.proj_drop(x_out)
-        x_out = rearrange(x_out, 'b (h w) c -> b c h w', h=H, w=W)
+        x_out = rearrange(x_out, "b (h w) c -> b c h w", h=H, w=W)
 
         return x_out
 
@@ -210,8 +205,7 @@ class Conv(nn.Module):
 
 
 class PSABloc_PnPNystraAttention(nn.Module):
-    """
-    PSABlock class implementing a Position-Sensitive Attention block for neural networks.
+    """PSABlock class implementing a Position-Sensitive Attention block for neural networks.
 
     This class encapsulates the functionality for applying multi-head attention and feed-forward neural network layers
     with optional shortcut connections.
@@ -238,12 +232,7 @@ class PSABloc_PnPNystraAttention(nn.Module):
 
         # 关键修复：传递所有必要参数，而非仅dim
         self.attn = PnPNystraAttention(
-            dim=c,
-            num_heads=num_heads,
-            num_landmarks=num_landmarks,
-            iters=iters,
-            attn_drop=0.1,
-            proj_drop=0.1
+            dim=c, num_heads=num_heads, num_landmarks=num_landmarks, iters=iters, attn_drop=0.1, proj_drop=0.1
         )
         self.ffn = nn.Sequential(Conv(c, c * 2, 1), Conv(c * 2, c, 1, act=False))
         self.add = shortcut
@@ -256,8 +245,7 @@ class PSABloc_PnPNystraAttention(nn.Module):
 
 
 class C2PSA_PnPNystraAttention(nn.Module):
-    """
-    C2PSA module with attention mechanism for enhanced feature extraction and processing.
+    """C2PSA module with attention mechanism for enhanced feature extraction and processing.
 
     This module implements a convolutional block with attention mechanisms to enhance feature extraction and processing
     capabilities. It includes a series of PSABlock modules for self-attention and feed-forward operations.
@@ -271,13 +259,13 @@ class C2PSA_PnPNystraAttention(nn.Module):
     Methods:
         forward: Performs a forward pass through the C2PSA module, applying attention and feed-forward operations.
 
-    Notes:
-        This module essentially is the same as PSA module, but refactored to allow stacking more PSABlock modules.
-
     Examples:
         >>> c2psa = C2PSA_PnPNystraAttention(c1=256, c2=256, n=3, e=0.5)
         >>> input_tensor = torch.randn(1, 256, 64, 64)
         >>> output_tensor = c2psa(input_tensor)
+
+    Notes:
+        This module essentially is the same as PSA module, but refactored to allow stacking more PSABlock modules.
     """
 
     def __init__(self, c1, c2, n=1, e=0.5):
@@ -289,15 +277,18 @@ class C2PSA_PnPNystraAttention(nn.Module):
         self.cv2 = Conv(2 * self.c, c1, 1)
 
         # 修复：传递num_landmarks/iters参数到PSABloc_PnPNystraAttention
-        self.m = nn.Sequential(*(
-            PSABloc_PnPNystraAttention(
-                self.c,
-                attn_ratio=0.5,
-                num_heads=self.c // 64,
-                num_landmarks=64,  # 自定义landmark数量
-                iters=6  # 自定义迭代次数
-            ) for _ in range(n)
-        ))
+        self.m = nn.Sequential(
+            *(
+                PSABloc_PnPNystraAttention(
+                    self.c,
+                    attn_ratio=0.5,
+                    num_heads=self.c // 64,
+                    num_landmarks=64,  # 自定义landmark数量
+                    iters=6,  # 自定义迭代次数
+                )
+                for _ in range(n)
+            )
+        )
 
     def forward(self, x):
         """Processes the input tensor 'x' through a series of PSA blocks and returns the transformed tensor."""
@@ -308,7 +299,7 @@ class C2PSA_PnPNystraAttention(nn.Module):
 
 
 def main():
-    """测试函数：验证PnPNystraAttention模块的功能正确性（启用确定性模式）"""
+    """测试函数：验证PnPNystraAttention模块的功能正确性（启用确定性模式）."""
     torch.manual_seed(42)  # 固定随机种子，保证结果可复现
     torch.use_deterministic_algorithms(True, warn_only=False)  # 启用严格确定性模式
 
@@ -320,7 +311,7 @@ def main():
         iters=6,  # 伪逆迭代次数
         qkv_bias=True,  # QKV使用偏置
         attn_drop=0.1,  # 注意力dropout率10%
-        proj_drop=0.1  # 输出投影dropout率10%
+        proj_drop=0.1,  # 输出投影dropout率10%
     ).to("cuda" if torch.cuda.is_available() else "cpu")
 
     # 2. 创建四维输入（模拟图像特征，测试非整除尺寸：65x65）

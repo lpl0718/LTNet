@@ -292,13 +292,12 @@ class BaseTrainer:
 
         # 根据特殊代码添加不同的冻结层
         if has_1001:
-            always_freeze_names.extend([ ".cv2.0", ".cv3.0"])
+            always_freeze_names.extend([".cv2.0", ".cv3.0"])
             LOGGER.info("1001 found in freeze list, freezing '.dfl', '.cv2.0' and '.cv3.0'")
 
         if has_1010:
-            always_freeze_names.extend([ ".cv2.0", ".cv2.1", ".cv3.0", ".cv3.1"])
+            always_freeze_names.extend([".cv2.0", ".cv2.1", ".cv3.0", ".cv3.1"])
             LOGGER.info("1010 found in freeze list, freezing '.dfl', '.cv2.1', '.cv2.2', '.cv3.1' and '.cv3.2'")
-
 
         freeze_layer_names = [f"model.{x}." for x in freeze_list] + always_freeze_names
         self.freeze_layer_names = freeze_layer_names
@@ -313,12 +312,6 @@ class BaseTrainer:
                     "See ultralytics.engine.trainer for customization of frozen layers."
                 )
                 v.requires_grad = True
-
-
-
-
-
-
 
         # Check AMP
         self.amp = torch.tensor(self.args.amp).to(self.device)  # True or False

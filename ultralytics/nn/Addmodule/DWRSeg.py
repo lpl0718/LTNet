@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-__all__ = ['C3k2_DWRSeg']
+__all__ = ["C3k2_DWRSeg"]
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -15,6 +15,7 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
 
 class Conv(nn.Module):
     """Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)."""
+
     default_act = nn.SiLU()  # default activation
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
@@ -71,6 +72,7 @@ class DWRSeg_Conv(nn.Module):
         x = self.gelu(self.bn(x))
         return x
 
+
 class Bottleneck_DWRSeg(nn.Module):
     """Standard bottleneck."""
 
@@ -101,7 +103,8 @@ class C2f_DWRSeg(nn.Module):
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
         self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
         self.m = nn.ModuleList(
-            Bottleneck_DWRSeg(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
+            Bottleneck_DWRSeg(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n)
+        )
 
     def forward(self, x):
         """Forward pass through C2f layer."""
@@ -127,6 +130,7 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
 
 class Conv(nn.Module):
     """Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)."""
+
     default_act = nn.SiLU()  # default activation
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
@@ -186,6 +190,7 @@ class C2f(nn.Module):
         y.extend(m(y[-1]) for m in self.m)
         return self.cv2(torch.cat(y, 1))
 
+
 class C3(nn.Module):
     """CSP Bottleneck with 3 convolutions."""
 
@@ -202,6 +207,7 @@ class C3(nn.Module):
         """Forward pass through the CSP bottleneck with 2 convolutions."""
         return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), 1))
 
+
 class C3k(C3):
     """C3k is a CSP bottleneck module with customizable kernel sizes for feature extraction in neural networks."""
 
@@ -211,6 +217,7 @@ class C3k(C3):
         c_ = int(c2 * e)  # hidden channels
         # self.m = nn.Sequential(*(RepBottleneck(c_, c_, shortcut, g, k=(k, k), e=1.0) for _ in range(n)))
         self.m = nn.Sequential(*(Bottleneck(c_, c_, shortcut, g, k=(k, k), e=1.0) for _ in range(n)))
+
 
 class C3k2_DWRSeg(C2f):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
