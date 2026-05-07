@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
     if d > 1:
@@ -9,8 +10,10 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
 
+
 class Conv(nn.Module):
     """Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)."""
+
     default_act = nn.SiLU()  # default activation
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
@@ -28,8 +31,9 @@ class Conv(nn.Module):
         """Perform transposed convolution of 2D data."""
         return self.act(self.conv(x))
 
-def drop_path(x, drop_prob: float = 0., training: bool = False):
-    if drop_prob == 0. or not training:
+
+def drop_path(x, drop_prob: float = 0.0, training: bool = False):
+    if drop_prob == 0.0 or not training:
         return x
     keep_prob = 1 - drop_prob
     shape = (x.shape[0],) + (1,) * (x.ndim - 1)
@@ -39,9 +43,10 @@ def drop_path(x, drop_prob: float = 0., training: bool = False):
     output = x.div(keep_prob) * random_tensor
     return output
 
+
 class DropPath(nn.Module):
     def __init__(self, drop_prob=None):
-        super(DropPath, self).__init__()
+        super().__init__()
         self.drop_prob = drop_prob
 
     def forward(self, x):
@@ -50,7 +55,7 @@ class DropPath(nn.Module):
 
 class h_sigmoid(nn.Module):
     def __init__(self, inplace=True):
-        super(h_sigmoid, self).__init__()
+        super().__init__()
         self.relu = nn.ReLU6(inplace=inplace)
 
     def forward(self, x):
@@ -59,7 +64,7 @@ class h_sigmoid(nn.Module):
 
 class h_swish(nn.Module):
     def __init__(self, inplace=True):
-        super(h_swish, self).__init__()
+        super().__init__()
         self.sigmoid = h_sigmoid(inplace=inplace)
 
     def forward(self, x):
@@ -68,7 +73,7 @@ class h_swish(nn.Module):
 
 class CA(nn.Module):
     def __init__(self, inp, reduction=32):
-        super(CA, self).__init__()
+        super().__init__()
         self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
         self.pool_w = nn.AdaptiveAvgPool2d((1, None))
 
@@ -84,7 +89,7 @@ class CA(nn.Module):
     def forward(self, x):
         identity = x
 
-        n, c, h, w = x.size()
+        _n, _c, h, w = x.size()
         x_h = self.pool_h(x)
         x_w = self.pool_w(x).permute(0, 1, 3, 2)
 
@@ -102,20 +107,19 @@ class CA(nn.Module):
         out = identity * a_w * a_h
 
         return out
-    
-    
+
+
 class DSConv_CA(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, expansion=1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
         self.dw_conv = Conv(expanded_c, expanded_c, k=k, s=s, g=expanded_c)
 
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
 
         self.cv1 = Conv(expanded_c, c2, k=1, s=1)
-
 
     def forward(self, x):
 
@@ -127,17 +131,17 @@ class DSConv_CA(nn.Module):
             y += x
 
         return y
+
 
 class CA_DSConv(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, expansion=1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
         self.dw_conv = Conv(expanded_c, expanded_c, k=k, s=s, g=expanded_c)
         self.cv1 = Conv(expanded_c, c2, k=1, s=1)
-
 
     def forward(self, x):
 
@@ -151,10 +155,8 @@ class CA_DSConv(nn.Module):
         return y
 
 
-
-
 class SPDConv(nn.Module):
-    def __init__(self, c1, c2,k=1,s=1 ,p=None ,g=1, d=1,act=True):
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__()
         self.d = d
         self.out = c2
@@ -167,15 +169,17 @@ class SPDConv(nn.Module):
 
 
 class SPD(nn.Module):
-     def __init__(self, c1, c2=None, d=1):
-         super().__init__()
-         self.d = d
-         # 计算输出通道数：输入通道数乘以4（因为空间拆分成4份）
-         self.c1 = c1
-         self.c2 = c1 * 4  # 输出通道数
+    def __init__(self, c1, c2=None, d=1):
+        super().__init__()
+        self.d = d
+        # 计算输出通道数：输入通道数乘以4（因为空间拆分成4份）
+        self.c1 = c1
+        self.c2 = c1 * 4  # 输出通道数
 
-     def forward(self, x):
-         return torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)
+    def forward(self, x):
+        return torch.cat([x[..., ::2, ::2], x[..., 1::2, ::2], x[..., ::2, 1::2], x[..., 1::2, 1::2]], 1)
+
+
 #         size_tensor = x.size()
 #         return torch.cat([x[...,0:size_tensor[2]//2,0:size_tensor[3]//2],
 #                          x[...,0:size_tensor[2]//2,size_tensor[3]//2:],
@@ -186,16 +190,13 @@ class SPD(nn.Module):
 class SPDConv_CA(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, expansion=1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
         self.spd_conv = SPDConv(expanded_c, expanded_c, k=1, s=1)
 
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
         self.cv1 = Conv(expanded_c, c2, k=1, s=1)
-
-
-
 
     def forward(self, x):
 
@@ -209,16 +210,16 @@ class SPDConv_CA(nn.Module):
 
         return y
 
+
 class CA_SPDConv(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, expansion=1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
         self.spd_conv = SPDConv(expanded_c, c2, k=1, s=1)
         self.cv1 = Conv(expanded_c, c2, k=1, s=1)
-
 
     def forward(self, x):
 
@@ -226,27 +227,21 @@ class CA_SPDConv(nn.Module):
         y = self.ca(y)
         y = self.spd_conv(y)
 
-
         if self.has_shortcut:
             y += x
 
         return y
 
 
-
 class DWTForward(nn.Module):
-    def __init__(self, J=1, wave='haar', mode='zero'):
+    def __init__(self, J=1, wave="haar", mode="zero"):
         super().__init__()
         self.J = J
         # 直接定义4维卷积核，自动跟随模型精度/设备
-        self.register_buffer('kernel_ll', torch.tensor([[[[1.0, 1.0],
-                                                           [1.0, 1.0]]]], dtype=torch.float32) / 2.0)
-        self.register_buffer('kernel_lh', torch.tensor([[[[1.0, -1.0],
-                                                           [1.0, -1.0]]]], dtype=torch.float32) / 2.0)
-        self.register_buffer('kernel_hl', torch.tensor([[[[1.0, 1.0],
-                                                           [-1.0, -1.0]]]], dtype=torch.float32) / 2.0)
-        self.register_buffer('kernel_hh', torch.tensor([[[[1.0, -1.0],
-                                                           [-1.0, 1.0]]]], dtype=torch.float32) / 2.0)
+        self.register_buffer("kernel_ll", torch.tensor([[[[1.0, 1.0], [1.0, 1.0]]]], dtype=torch.float32) / 2.0)
+        self.register_buffer("kernel_lh", torch.tensor([[[[1.0, -1.0], [1.0, -1.0]]]], dtype=torch.float32) / 2.0)
+        self.register_buffer("kernel_hl", torch.tensor([[[[1.0, 1.0], [-1.0, -1.0]]]], dtype=torch.float32) / 2.0)
+        self.register_buffer("kernel_hh", torch.tensor([[[[1.0, -1.0], [-1.0, 1.0]]]], dtype=torch.float32) / 2.0)
 
     def forward(self, x):
         B, C, H, W = x.shape
@@ -263,10 +258,10 @@ class DWTForward(nn.Module):
         yh3 = nn.functional.conv2d(x_r, self.kernel_hh, stride=2)
 
         # 恢复形状
-        yl = yl.reshape(B, C, H//2, W//2)
-        yh1 = yh1.reshape(B, C, H//2, W//2)
-        yh2 = yh2.reshape(B, C, H//2, W//2)
-        yh3 = yh3.reshape(B, C, H//2, W//2)
+        yl = yl.reshape(B, C, H // 2, W // 2)
+        yh1 = yh1.reshape(B, C, H // 2, W // 2)
+        yh2 = yh2.reshape(B, C, H // 2, W // 2)
+        yh3 = yh3.reshape(B, C, H // 2, W // 2)
 
         # 输出格式对齐 pytorch_wavelets (yl, (yh,))
         yh = torch.stack([yh1, yh2, yh3], dim=2)
@@ -275,11 +270,12 @@ class DWTForward(nn.Module):
 
 class Down_wt(nn.Module):
     def __init__(self, in_ch, out_ch):
-        super(Down_wt, self).__init__()
-        self.wt = DWTForward(J=1, mode='zero', wave='haar')
+        super().__init__()
+        self.wt = DWTForward(J=1, mode="zero", wave="haar")
         self.conv_bn_relu = nn.Sequential(
-            nn.Conv2d(in_ch*4, out_ch, kernel_size=1, stride=1, bias=False), # 加bias=False，和BN层搭配无意义，节省显存+加速
-
+            nn.Conv2d(
+                in_ch * 4, out_ch, kernel_size=1, stride=1, bias=False
+            ),  # 加bias=False，和BN层搭配无意义，节省显存+加速
             nn.BatchNorm2d(out_ch),
             nn.SiLU(inplace=True),
         )
@@ -295,18 +291,18 @@ class Down_wt(nn.Module):
         x = self.conv_bn_relu(x)
         return x
 
+
 class HWD_CA(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, expansion=1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
         self.hwd = Down_wt(expanded_c, expanded_c)
 
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
 
         self.cv1 = Conv(expanded_c, c2, k=1, s=1)
-
 
     def forward(self, x):
 
@@ -320,15 +316,13 @@ class HWD_CA(nn.Module):
         return y
 
 
-
-
 class CA_HWD(nn.Module):
-    def __init__(self, c1, c2, k=3, s=1, expansion=1,drop_connect_rate=0.1):
+    def __init__(self, c1, c2, k=3, s=1, expansion=1, drop_connect_rate=0.1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
         self.hwd = Down_wt(expanded_c, c2)
         # self.cv1 = Conv(expanded_c, c2, k=1, s=1)
         self.drop_connect_rate = drop_connect_rate
@@ -349,19 +343,17 @@ class CA_HWD(nn.Module):
         return y
 
 
-
 class Conv_CA(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, expansion=1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
         self.conv = Conv(expanded_c, expanded_c, k=k, s=s)
 
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
 
         self.cv1 = Conv(expanded_c, c2, k=1, s=1)
-
 
     def forward(self, x):
 
@@ -375,24 +367,21 @@ class Conv_CA(nn.Module):
         return y
 
 
-
 class CA_Conv(nn.Module):
     def __init__(self, c1, c2, k=3, s=1, expansion=1):
         super().__init__()
-        self.has_shortcut = (s == 1 and c1 == c2)
+        self.has_shortcut = s == 1 and c1 == c2
         expanded_c = c1 * expansion
         self.expansion_conv = Conv(c1, expanded_c, k=1, s=1)
-        self.ca = CA(expanded_c,expanded_c)
+        self.ca = CA(expanded_c, expanded_c)
         self.conv = Conv(expanded_c, c2, k=k, s=s)
         self.cv1 = Conv(expanded_c, c2, k=1, s=1)
-
 
     def forward(self, x):
 
         y = self.expansion_conv(x)
         y = self.ca(y)
         y = self.conv(y)
-        
 
         if self.has_shortcut:
             y += x
@@ -400,42 +389,37 @@ class CA_Conv(nn.Module):
         return y
 
 
-
-
 if __name__ == "__main__":
-
     # 创建一个形状为 [batch_size, channels, height, width] 的虚拟输入张量
     input = torch.randn(2, 128, 40, 40)
-    ca = CA(128,128)
+    ca = CA(128, 128)
     output1 = ca(input)
     print(output1.size())
 
-    ca_ds=CA_DSConv(128,128,3,2,2)
-    ds_ca=DSConv_CA(128,128,3,2,2)
-    output2=ca_ds(input)
+    ca_ds = CA_DSConv(128, 128, 3, 2, 2)
+    ds_ca = DSConv_CA(128, 128, 3, 2, 2)
+    output2 = ca_ds(input)
     output3 = ds_ca(input)
     print(output2.size())
     print(output3.size())
 
-    ca_spd=CA_SPDConv(128,128,3,2,2)
-    spd_ca=SPDConv_CA(128,128,3,2,2)
-    output4 =spd_ca(input)
-    output5 =ca_spd(input)
+    ca_spd = CA_SPDConv(128, 128, 3, 2, 2)
+    spd_ca = SPDConv_CA(128, 128, 3, 2, 2)
+    output4 = spd_ca(input)
+    output5 = ca_spd(input)
     print(output4.size())
     print(output5.size())
 
-
-    ca_hwd=CA_HWD(128,128,3,2,2)
-    hwd_ca=HWD_CA(128,128,3,2,2)
-    output6 =hwd_ca(input)
-    output7 =ca_hwd(input)
+    ca_hwd = CA_HWD(128, 128, 3, 2, 2)
+    hwd_ca = HWD_CA(128, 128, 3, 2, 2)
+    output6 = hwd_ca(input)
+    output7 = ca_hwd(input)
     print(output6.size())
     print(output7.size())
 
-
-    ca_conv=CA_Conv(128,128,3,2,2)
-    conv_ca=Conv_CA(128,128,3,2,2)
-    output8 =conv_ca(input)
-    output9 =ca_conv(input)
+    ca_conv = CA_Conv(128, 128, 3, 2, 2)
+    conv_ca = Conv_CA(128, 128, 3, 2, 2)
+    output8 = conv_ca(input)
+    output9 = ca_conv(input)
     print(output8.size())
     print(output9.size())

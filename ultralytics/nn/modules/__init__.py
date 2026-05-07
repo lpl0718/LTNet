@@ -58,7 +58,7 @@ from .block import (
     RepVGGDW,
     ResNetLayer,
     SCDown,
-    TorchVision
+    TorchVision,
 )
 from .conv import (
     CBAM,
@@ -81,6 +81,7 @@ from .head import (
     Classify,
     Detect,
     LRPCHead,
+    PC_Detect,
     Pose,
     RTDETRDecoder,
     Segment,
@@ -88,7 +89,6 @@ from .head import (
     YOLOEDetect,
     YOLOESegment,
     v10Detect,
-    PC_Detect,
 )
 from .transformer import (
     AIFI,
@@ -120,8 +120,7 @@ __all__ = (
     "SPP",
     "SPPELAN",
     "SPPF",
-    "SPPF2"
-    "A2C2f",
+    "SPPF2A2C2f",
     "AConv",
     "ADown",
     "Attention",

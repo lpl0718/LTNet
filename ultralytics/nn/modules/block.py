@@ -232,8 +232,6 @@ class SPPF(nn.Module):
         return self.cv2(torch.cat(y, 1))
 
 
-
-
 class C1(nn.Module):
     """CSP Bottleneck with 1 convolution."""
 

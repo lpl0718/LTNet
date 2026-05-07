@@ -21,7 +21,19 @@ from .conv import Conv, DWConv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "OBB", "Classify", "Detect", "Pose", "RTDETRDecoder", "Segment", "YOLOEDetect", "YOLOESegment", "v10Detect","PC_Detect", "LRPCHead"
+__all__ = (
+    "OBB",
+    "Classify",
+    "Detect",
+    "LRPCHead",
+    "PC_Detect",
+    "Pose",
+    "RTDETRDecoder",
+    "Segment",
+    "YOLOEDetect",
+    "YOLOESegment",
+    "v10Detect",
+)
 
 
 class Detect(nn.Module):
@@ -94,8 +106,6 @@ class Detect(nn.Module):
         self.cv2 = nn.ModuleList(
             nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)) for x in ch
         )
-
-
 
         # self.cv3 = nn.ModuleList(
         #     nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)) for x in ch
@@ -1190,8 +1200,6 @@ class v10Detect(Detect):
         self.cv2 = self.cv3 = nn.ModuleList([nn.Identity()] * self.nl)
 
 
-
-
 # class CE(nn.Module):
 #     def __init__(self, c1):
 #         super().__init__()
@@ -1226,8 +1234,6 @@ class v10Detect(Detect):
 #         # P4 上采样后与 P3 相加
 #         x_p4_2_p3 = self.up_forp4(x_p4)
 #         return x_p3 + x_p4_2_p3
-
-
 
 
 # # ========== PC_Detect ==========
@@ -1293,8 +1299,10 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
         p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
     return p
 
+
 class Conv(nn.Module):
     """Standard convolution with args(ch_in, ch_out, kernel, stride, padding, groups, dilation, activation)."""
+
     default_act = nn.SiLU()  # default activation
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
@@ -1312,33 +1320,28 @@ class Conv(nn.Module):
         """Perform transposed convolution of 2D data."""
         return self.act(self.conv(x))
 
+
 # LightDualDown（简洁 + 语义完整）；
 # Lightweight Dual-Path Downsampling或缩写LD-Down；
 
-class LDD(nn.Module):#双通道下采样拼接
 
-
+class LDD(nn.Module):  # 双通道下采样拼接
     def __init__(self, c1, c2, k=3, s=2, p=None, g=1, d=1, act=True):
 
         super().__init__()
-        c_ = c2//2
+        c_ = c2 // 2
         self.dw_conv = Conv(c1, c1, k, s, g=c1)
-        self.cv1 = Conv(c1, c_, 1,1)
+        self.cv1 = Conv(c1, c_, 1, 1)
 
-        self.avgpool = nn.AvgPool2d(3,2,1)
-        self.cv2 = Conv(c1,c_,1,1)
+        self.avgpool = nn.AvgPool2d(3, 2, 1)
+        self.cv2 = Conv(c1, c_, 1, 1)
 
     def forward(self, x):
         x1 = self.dw_conv(x)
         x2 = self.cv1(x1)
         x3 = self.avgpool(x)
         x4 = self.cv2(x3)
-        return torch.cat([x2,x4],dim=1)
-
-
-
-
-
+        return torch.cat([x2, x4], dim=1)
 
 
 class CE(nn.Module):
@@ -1351,28 +1354,27 @@ class CE(nn.Module):
         x = torch.concat([self.ldd(x_p3), x_p4], dim=1)
         return x
 
+
 class PE(nn.Module):
-    """Position Enhancement Module"""
-    def __init__(self, c1, c2,a=0.66,b=0.33,learnable_weight=True,print_freq=5):
+    """Position Enhancement Module."""
+
+    def __init__(self, c1, c2, a=0.66, b=0.33, learnable_weight=True, print_freq=5):
         """
         Args:
             c1: tuple of (c_p3, c_p4) - input channels
-            c2: output channels
+            c2: output channels.
         """
         super().__init__()
         self.adjust_channel_forp3 = Conv(c1[0], c2, k=1)
         self.adjust_channel_forp4 = Conv(c1[1], c2, k=1)
 
-        self.up_forp4 = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='nearest'),
-            Conv(c2, c2, k=1)
-        )
+        self.up_forp4 = nn.Sequential(nn.Upsample(scale_factor=2, mode="nearest"), Conv(c2, c2, k=1))
         if learnable_weight:
             self.a = nn.Parameter(torch.tensor(a, dtype=torch.float32))
             self.b = nn.Parameter(torch.tensor(b, dtype=torch.float32))
         else:
-            self.register_buffer('a', torch.tensor(a, dtype=torch.float32))
-            self.register_buffer('b', torch.tensor(b, dtype=torch.float32))
+            self.register_buffer("a", torch.tensor(a, dtype=torch.float32))
+            self.register_buffer("b", torch.tensor(b, dtype=torch.float32))
 
         self.print_freq = print_freq  # 每N步打印一次
         self.counter = 0  # 步数计数器
@@ -1384,7 +1386,6 @@ class PE(nn.Module):
         # P4 上采样后与 P3 相加
         x_p4_2_p3 = self.up_forp4(x_p4)
 
-
         if self.training:
             self.counter += 1
             if self.counter % self.print_freq == 0:
@@ -1392,20 +1393,18 @@ class PE(nn.Module):
                 b_val = self.b.item()
                 print(f"PE模块 - 第{self.counter}步 | a={a_val:.4f}, b={b_val:.4f}")
 
-        out = x_p3*self.a + x_p4_2_p3*self.b
+        out = x_p3 * self.a + x_p4_2_p3 * self.b
         out = nn.SiLU()(out)
 
-        return torch.cat([x_p3,out],1)
-
-
+        return torch.cat([x_p3, out], 1)
 
 
 # ========== 完全采用你改进的 PC_Detect ==========
 class PC_Detect(nn.Module):
+    """Position-Classification Decoupled Detect Head for YOLOv11 (Anchor-Free) Single-scale detection with enhanced
+    feature fusion.
     """
-    Position-Classification Decoupled Detect Head for YOLOv11 (Anchor-Free)
-    Single-scale detection with enhanced feature fusion
-    """
+
     dynamic = False
     export = False
     format = None
@@ -1426,7 +1425,7 @@ class PC_Detect(nn.Module):
         self.no = nc + self.reg_max * 4  # 输出通道数
 
         # 修复1：动态匹配stride长度，避免和特征图层数不匹配
-        self.stride = torch.tensor([8.0, 16.0])[:self.nl] if self.nl > 0 else torch.tensor([8.0])
+        self.stride = torch.tensor([8.0, 16.0])[: self.nl] if self.nl > 0 else torch.tensor([8.0])
 
         # 修复2：ch为空时的默认值，避免索引报错
         ch0 = ch[0] if len(ch) >= 1 else 64  # 默认P3通道64
@@ -1456,8 +1455,6 @@ class PC_Detect(nn.Module):
         #     )
         # )
 
-
-
         # 回归分支 (Box)
         # self.cv2 = nn.Sequential(
         #     Conv(c2, c2, 3),
@@ -1465,19 +1462,17 @@ class PC_Detect(nn.Module):
         #     nn.Conv2d(c2, 4 * self.reg_max, 1)
         # )
         self.cv2 = nn.Sequential(
-            Conv(2*c2,c2,1),
-            Conv(c2, c2, 3),
-            Conv(c2, c2, 3),
-            nn.Conv2d(c2, 4 * self.reg_max, 1)
+            Conv(2 * c2, c2, 1), Conv(c2, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)
         )
-
 
         # 分类分支 (Cls) - 输出 nc*4 用于 rearrange 上采样
         self.cv3 = nn.Sequential(
             Conv(ch0 + ch1, ch0 + ch1, 1),
-            DWConv((ch0 + ch1), (ch0 + ch1), 3),Conv((ch0 + ch1), c3, 1),
-            DWConv(c3, c3,3),Conv(c3,c3,1),
-            nn.Conv2d(c3, self.nc * 4, 1)
+            DWConv((ch0 + ch1), (ch0 + ch1), 3),
+            Conv((ch0 + ch1), c3, 1),
+            DWConv(c3, c3, 3),
+            Conv(c3, c3, 1),
+            nn.Conv2d(c3, self.nc * 4, 1),
         )
 
         self.ph, self.pw = 2, 2
@@ -1493,17 +1488,15 @@ class PC_Detect(nn.Module):
         if self.end2end:
             return self.forward_end2end(x)
 
-        pe_feat = self.pe(x)   # [bs, c2, h, w] 例如 (1, 64, 80, 80)
-        ce_feat = self.ce(x)   # [bs, ch1+ch2, h/2, w/2] 例如 (1, 256, 40, 40)
+        pe_feat = self.pe(x)  # [bs, c2, h, w] 例如 (1, 64, 80, 80)
+        ce_feat = self.ce(x)  # [bs, ch1+ch2, h/2, w/2] 例如 (1, 256, 40, 40)
 
-        reg_pred = self.cv2(pe_feat)   # [bs, reg_max*4, h, w]
-        cls_pred = self.cv3(ce_feat)   # [bs, nc*4, h/2, w/2]
+        reg_pred = self.cv2(pe_feat)  # [bs, reg_max*4, h, w]
+        cls_pred = self.cv3(ce_feat)  # [bs, nc*4, h/2, w/2]
 
-        #rearrange 语法（上采样 2x）
+        # rearrange 语法（上采样 2x）
         cls_pred = rearrange(
-            cls_pred,
-            "bs (nc ph pw) h w -> bs nc (h ph) (w pw)",
-            nc=self.nc, ph=self.ph, pw=self.pw
+            cls_pred, "bs (nc ph pw) h w -> bs nc (h ph) (w pw)", nc=self.nc, ph=self.ph, pw=self.pw
         ).contiguous()  # [bs, nc, h, w]
 
         # 拼接 [bs, reg_max*4 + nc, h, w]
@@ -1525,9 +1518,7 @@ class PC_Detect(nn.Module):
         cls_pred_detach = self.one2one_cv3(ce_feat_detach)
         # rearrange
         cls_pred_detach = rearrange(
-            cls_pred_detach,
-            "bs (nc ph pw) h w -> bs nc (h ph) (w pw)",
-            nc=self.nc, ph=self.ph, pw=self.pw
+            cls_pred_detach, "bs (nc ph pw) h w -> bs nc (h ph) (w pw)", nc=self.nc, ph=self.ph, pw=self.pw
         ).contiguous()
         one2one = [torch.cat([reg_pred_detach, cls_pred_detach], dim=1)]
 
@@ -1536,9 +1527,7 @@ class PC_Detect(nn.Module):
         reg_pred = self.cv2(pe_feat)
         cls_pred = self.cv3(ce_feat)
         cls_pred = rearrange(
-            cls_pred,
-            "bs (nc ph pw) h w -> bs nc (h ph) (w pw)",
-            nc=self.nc, ph=self.ph, pw=self.pw
+            cls_pred, "bs (nc ph pw) h w -> bs nc (h ph) (w pw)", nc=self.nc, ph=self.ph, pw=self.pw
         ).contiguous()
         x = [torch.cat([reg_pred, cls_pred], dim=1)]
 
@@ -1550,13 +1539,12 @@ class PC_Detect(nn.Module):
         return y if self.export else (y, {"one2many": x, "one2one": one2one})
 
     def _inference(self, x: list[torch.Tensor]) -> torch.Tensor:
-        """推理时解码边界框"""
+        """推理时解码边界框."""
         shape = x[0].shape  # [bs, no, h, w]
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)  # [bs, no, N]
 
         if self.dynamic or self.shape != shape:
-
-            self.anchors, self.strides = (x.transpose(0, 1) for x in make_anchors(x, self.stride[:len(x)], 0.5))
+            self.anchors, self.strides = (x.transpose(0, 1) for x in make_anchors(x, self.stride[: len(x)], 0.5))
             self.shape = shape
 
         # 分离 box 和 cls
@@ -1566,7 +1554,7 @@ class PC_Detect(nn.Module):
         return torch.cat((dbox, cls.sigmoid()), 1)
 
     def bias_init(self):
-        """偏置初始化（鲁棒性优化）"""
+        """偏置初始化（鲁棒性优化）."""
         # 补充 use_stride 定义，避免报错
         self.use_stride = self.stride[0] if len(self.stride) > 0 else 8.0
         stride_val = max(self.use_stride.item(), 1.0)
@@ -1578,14 +1566,14 @@ class PC_Detect(nn.Module):
         # 分类分支偏置
         if self.cv3[-1].bias is not None:
             cls_bias = math.log(5 / (self.nc + 1e-6) / ((640 / stride_val) ** 2 + 1e-6))
-            self.cv3[-1].bias.data[:self.nc * 4] = cls_bias
+            self.cv3[-1].bias.data[: self.nc * 4] = cls_bias
 
         # end2end 分支
         if self.end2end:
             if self.one2one_cv2[-1].bias is not None:
                 self.one2one_cv2[-1].bias.data[:] = 1.0
             if self.one2one_cv3[-1].bias is not None:
-                self.one2one_cv3[-1].bias.data[:self.nc * 4] = cls_bias
+                self.one2one_cv3[-1].bias.data[: self.nc * 4] = cls_bias
 
     def decode_bboxes(self, bboxes: torch.Tensor, anchors: torch.Tensor, xywh: bool = True) -> torch.Tensor:
         return dist2bbox(
@@ -1597,7 +1585,7 @@ class PC_Detect(nn.Module):
 
     @staticmethod
     def postprocess(preds: torch.Tensor, max_det: int, nc: int = 80) -> torch.Tensor:
-        """后处理：NMS 前处理"""
+        """后处理：NMS 前处理."""
         batch_size, anchors, _ = preds.shape
         boxes, scores = preds.split([4, nc], dim=-1)
 
@@ -1610,8 +1598,4 @@ class PC_Detect(nn.Module):
         scores, index = scores.flatten(1).topk(min(max_det, anchors))
         i = torch.arange(batch_size)[..., None]  # batch indices
 
-        return torch.cat([
-            boxes[i, index // nc],
-            scores[..., None],
-            (index % nc)[..., None].float()
-        ], dim=-1)
+        return torch.cat([boxes[i, index // nc], scores[..., None], (index % nc)[..., None].float()], dim=-1)
