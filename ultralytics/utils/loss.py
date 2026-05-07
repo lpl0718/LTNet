@@ -13,7 +13,7 @@ from ultralytics.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
 from ultralytics.utils.tal import RotatedTaskAlignedAssigner, TaskAlignedAssigner, dist2bbox, dist2rbox, make_anchors
 from ultralytics.utils.torch_utils import autocast
 
-from .metrics import bbox_iou, probiou,wasserstein_loss
+from .metrics import bbox_iou, probiou, wasserstein_loss
 from .tal import bbox2dist
 
 
@@ -48,9 +48,8 @@ class VarifocalLoss(nn.Module):
             # )
 
             loss = (
-                (F.binary_cross_entropy_with_logits(pred_score.float(), gt_score.float(), reduction="none") * weight)
-                .sum()
-            )
+                F.binary_cross_entropy_with_logits(pred_score.float(), gt_score.float(), reduction="none") * weight
+            ).sum()
         return loss
 
 
@@ -86,7 +85,7 @@ class FocalLoss(nn.Module):
             self.alpha = self.alpha.to(device=pred.device, dtype=pred.dtype)
             alpha_factor = label * self.alpha + (1 - label) * (1 - self.alpha)
             loss *= alpha_factor
-        #return loss.mean(1).sum()
+        # return loss.mean(1).sum()
         return loss.sum()
 
 
@@ -119,56 +118,57 @@ class BboxLoss(nn.Module):
         super().__init__()
         self.dfl_loss = DFLoss(reg_max) if reg_max > 1 else None
 
-
-    def forward(self, pred_dist, pred_bboxes, anchor_points, target_bboxes, target_scores, target_scores_sum, fg_mask,   #给P2加权
-                stride_tensor=None, p2_weight=1.0):  # 新增参数
+    def forward(
+        self,
+        pred_dist,
+        pred_bboxes,
+        anchor_points,
+        target_bboxes,
+        target_scores,
+        target_scores_sum,
+        fg_mask,  # 给P2加权
+        stride_tensor=None,
+        p2_weight=1.0,
+    ):  # 新增参数
         """Compute IoU and DFL losses for bounding boxes, with P2 layer weighting."""
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
 
         # ========== 新增：P2层加权 ==========
-         # 2. P2层加权（核心修复：维度匹配）
+        # 2. P2层加权（核心修复：维度匹配）
         if stride_tensor is not None:
-            
             batch_size = fg_mask.shape[0]
             stride_tensor_expanded = stride_tensor.expand(batch_size, -1, -1)  # [18, 33600, 1]
-        
-            fg_mask_expanded = fg_mask.unsqueeze(-1)  
-            stride_p2 = stride_tensor_expanded[fg_mask_expanded]  
-            stride_p2 = stride_p2.view(-1, 1)  
-          
-            p2_mask = (stride_p2 == 4).float()  
-            weight = weight * (1 + (p2_weight - 1) * p2_mask) 
 
+            fg_mask_expanded = fg_mask.unsqueeze(-1)
+            stride_p2 = stride_tensor_expanded[fg_mask_expanded]
+            stride_p2 = stride_p2.view(-1, 1)
 
+            p2_mask = (stride_p2 == 4).float()
+            weight = weight * (1 + (p2_weight - 1) * p2_mask)
 
-
-
-
-    # def forward(                            #CIoU
-    #     self,
-    #     pred_dist: torch.Tensor,
-    #     pred_bboxes: torch.Tensor,
-    #     anchor_points: torch.Tensor,
-    #     target_bboxes: torch.Tensor,
-    #     target_scores: torch.Tensor,
-    #     target_scores_sum: torch.Tensor,
-    #     fg_mask: torch.Tensor,
-    # ) -> tuple[torch.Tensor, torch.Tensor]:
-    #     """Compute IoU and DFL losses for bounding boxes."""
-    #     weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
-        iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)  
+        # def forward(                            #CIoU
+        #     self,
+        #     pred_dist: torch.Tensor,
+        #     pred_bboxes: torch.Tensor,
+        #     anchor_points: torch.Tensor,
+        #     target_bboxes: torch.Tensor,
+        #     target_scores: torch.Tensor,
+        #     target_scores_sum: torch.Tensor,
+        #     fg_mask: torch.Tensor,
+        # ) -> tuple[torch.Tensor, torch.Tensor]:
+        #     """Compute IoU and DFL losses for bounding boxes."""
+        #     weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
+        iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
         loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
 
-    # def forward(self, pred_dist, pred_bboxes, anchor_points, target_bboxes, target_scores, target_scores_sum, fg_mask):
-    #     """Compute IoU and DFL losses for bounding boxes."""
-    #     weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
+        # def forward(self, pred_dist, pred_bboxes, anchor_points, target_bboxes, target_scores, target_scores_sum, fg_mask):
+        #     """Compute IoU and DFL losses for bounding boxes."""
+        #     weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
         # iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, EIoU=True)   #Eiou
         # loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
 
-
-
-        nwd = wasserstein_loss(pred_bboxes[fg_mask], target_bboxes[fg_mask]) #0.08 NWDloss
-        iou_ratio = 0.08 #
+        nwd = wasserstein_loss(pred_bboxes[fg_mask], target_bboxes[fg_mask])  # 0.08 NWDloss
+        iou_ratio = 0.08  #
         nwd_loss = ((1.0 - nwd) * weight).sum() / target_scores_sum
         loss_iou = iou_ratio * loss_iou + (1 - iou_ratio) * nwd_loss
 
@@ -247,7 +247,6 @@ class v8DetectionLoss:
         self.bce = nn.BCEWithLogitsLoss(reduction="none")
         # self.bce =FocalLoss()
         # self.varifocal_loss =VarifocalLoss()
-
 
         self.hyp = h
         self.stride = m.stride  # model strides
@@ -346,8 +345,8 @@ class v8DetectionLoss:
                 target_scores,
                 target_scores_sum,
                 fg_mask,
-                stride_tensor = stride_tensor,  # 传递stride_tensor 和
-                p2_weight=1.0                # P2层加权系数，可调整（如1.5/2.5）
+                stride_tensor=stride_tensor,  # 传递stride_tensor 和
+                p2_weight=1.0,  # P2层加权系数，可调整（如1.5/2.5）
             )
 
         loss[0] *= self.hyp.box  # box gain
