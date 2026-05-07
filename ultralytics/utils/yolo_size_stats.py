@@ -2,22 +2,23 @@
 import numpy as np
 import torch
 
+
 class YOLOSizeStats:
-    """专门针对YOLO格式数据集的尺寸统计器"""
+    """专门针对YOLO格式数据集的尺寸统计器."""
 
     def __init__(self, img_size=640):
         self.img_size = img_size
-        self.categories = ['tiny', 'small', 'medium', 'large']
+        self.categories = ["tiny", "small", "medium", "large"]
         self.reset()
 
     def reset(self):
         self.stats = {}
         for cat in self.categories:
-            self.stats[cat] = {'gt': 0, 'pred': 0, 'tp': 0, 'fp': 0, 'fn': 0}
-        self.total = {'gt': 0, 'pred': 0, 'tp': 0, 'fp': 0, 'fn': 0}
+            self.stats[cat] = {"gt": 0, "pred": 0, "tp": 0, "fp": 0, "fn": 0}
+        self.total = {"gt": 0, "pred": 0, "tp": 0, "fp": 0, "fn": 0}
 
     def yolo_to_xyxy(self, yolo_bbox):
-        """将YOLO格式的xywh转换为xyxy格式"""
+        """将YOLO格式的xywh转换为xyxy格式."""
         if len(yolo_bbox) < 4:
             return None
 
@@ -36,21 +37,20 @@ class YOLOSizeStats:
         return [x1, y1, x2, y2]
 
     def get_size(self, bbox, is_yolo_format=True):
-        """
-        获取目标尺寸分类
+        """获取目标尺寸分类.
 
         Args:
             bbox: 边界框坐标 [x1,y1,x2,y2] 或 [x_center,y_center,width,height]
             is_yolo_format: 是否为YOLO格式的xywh
         """
         if len(bbox) < 4:
-            return 'unknown'
+            return "unknown"
 
         # 如果是YOLO格式，转换为xyxy
         if is_yolo_format:
             xyxy_bbox = self.yolo_to_xyxy(bbox)
             if xyxy_bbox is None:
-                return 'unknown'
+                return "unknown"
             x1, y1, x2, y2 = xyxy_bbox
         else:
             # 假设已经是xyxy格式
@@ -61,18 +61,17 @@ class YOLOSizeStats:
         h_pixel = (y2 - y1) * self.img_size
         area = w_pixel * h_pixel
 
-        if area < 16*16:
-            return 'tiny'
-        elif area < 32*32:
-            return 'small'
-        elif area < 64*64:
-            return 'medium'
+        if area < 16 * 16:
+            return "tiny"
+        elif area < 32 * 32:
+            return "small"
+        elif area < 64 * 64:
+            return "medium"
         else:
-            return 'large'
+            return "large"
 
     def box_iou(self, box1_xyxy, box2_yolo):
-        """
-        计算IoU
+        """计算IoU.
 
         Args:
             box1_xyxy: 预测框，xyxy格式（归一化）
@@ -117,8 +116,7 @@ class YOLOSizeStats:
         return inter / union
 
     def update(self, preds, gt_bboxes, gt_labels, img_id=0, iou_thres=0.5):
-        """
-        更新统计 - 简化的接口
+        """更新统计 - 简化的接口.
 
         Args:
             preds: 预测结果 [N, 6] (xyxy归一化, conf, cls)
@@ -134,10 +132,10 @@ class YOLOSizeStats:
                     pred_box = pred[:4].cpu().numpy()
                     size_cat = self.get_size(pred_box, is_yolo_format=False)
                     if size_cat in self.stats:
-                        self.stats[size_cat]['pred'] += 1
-                        self.stats[size_cat]['fp'] += 1
-                        self.total['pred'] += 1
-                        self.total['fp'] += 1
+                        self.stats[size_cat]["pred"] += 1
+                        self.stats[size_cat]["fp"] += 1
+                        self.total["pred"] += 1
+                        self.total["fp"] += 1
             return
 
         # 统计真实目标
@@ -145,8 +143,8 @@ class YOLOSizeStats:
             gt_bbox_np = gt_bbox.cpu().numpy()
             size_cat = self.get_size(gt_bbox_np, is_yolo_format=True)
             if size_cat in self.stats:
-                self.stats[size_cat]['gt'] += 1
-                self.total['gt'] += 1
+                self.stats[size_cat]["gt"] += 1
+                self.total["gt"] += 1
 
         # 如果没有预测，所有真实目标都是FN
         if preds is None or len(preds) == 0:
@@ -154,8 +152,8 @@ class YOLOSizeStats:
                 gt_bbox_np = gt_bbox.cpu().numpy()
                 size_cat = self.get_size(gt_bbox_np, is_yolo_format=True)
                 if size_cat in self.stats:
-                    self.stats[size_cat]['fn'] += 1
-                    self.total['fn'] += 1
+                    self.stats[size_cat]["fn"] += 1
+                    self.total["fn"] += 1
             return
 
         # 处理预测
@@ -181,8 +179,8 @@ class YOLOSizeStats:
             if pred_size_cat not in self.stats:
                 continue
 
-            self.stats[pred_size_cat]['pred'] += 1
-            self.total['pred'] += 1
+            self.stats[pred_size_cat]["pred"] += 1
+            self.total["pred"] += 1
 
             best_iou = 0
             best_idx = -1
@@ -209,17 +207,17 @@ class YOLOSizeStats:
                 gt_size_cat = self.get_size(gt_bbox_np, is_yolo_format=True)
 
                 if gt_size_cat == pred_size_cat:
-                    self.stats[pred_size_cat]['tp'] += 1
-                    self.total['tp'] += 1
+                    self.stats[pred_size_cat]["tp"] += 1
+                    self.total["tp"] += 1
                     gt_matched[best_idx] = True
                 else:
                     # 尺寸类别不匹配，视为FP
-                    self.stats[pred_size_cat]['fp'] += 1
-                    self.total['fp'] += 1
+                    self.stats[pred_size_cat]["fp"] += 1
+                    self.total["fp"] += 1
             else:
                 # FP：未匹配到真实目标
-                self.stats[pred_size_cat]['fp'] += 1
-                self.total['fp'] += 1
+                self.stats[pred_size_cat]["fp"] += 1
+                self.total["fp"] += 1
 
         # 统计FN（未匹配的真实目标）
         for j, matched in enumerate(gt_matched):
@@ -227,50 +225,50 @@ class YOLOSizeStats:
                 gt_bbox_np = gt_bboxes[j].cpu().numpy()
                 size_cat = self.get_size(gt_bbox_np, is_yolo_format=True)
                 if size_cat in self.stats:
-                    self.stats[size_cat]['fn'] += 1
-                    self.total['fn'] += 1
+                    self.stats[size_cat]["fn"] += 1
+                    self.total["fn"] += 1
 
     def get_metrics(self):
-        """计算并返回所有指标"""
+        """计算并返回所有指标."""
         metrics = {}
 
         for cat in self.categories:
             s = self.stats[cat]
-            tp, fp, fn = s['tp'], s['fp'], s['fn']
+            tp, fp, fn = s["tp"], s["fp"], s["fn"]
 
             precision = tp / (tp + fp + 1e-16)
             recall = tp / (tp + fn + 1e-16)
             ap = precision * recall  # 简化的AP计算
 
-            detection_rate = s['pred'] / max(s['gt'], 1)
+            detection_rate = s["pred"] / max(s["gt"], 1)
 
             metrics[cat] = {
-                'gt': s['gt'],
-                'pred': s['pred'],
-                'tp': s['tp'],
-                'fp': s['fp'],
-                'fn': s['fn'],
-                'precision': float(precision),
-                'recall': float(recall),
-                'ap': float(ap),
-                'detection_rate': float(detection_rate)
+                "gt": s["gt"],
+                "pred": s["pred"],
+                "tp": s["tp"],
+                "fp": s["fp"],
+                "fn": s["fn"],
+                "precision": float(precision),
+                "recall": float(recall),
+                "ap": float(ap),
+                "detection_rate": float(detection_rate),
             }
 
         # 总体指标
-        total_tp, total_fp, total_fn = self.total['tp'], self.total['fp'], self.total['fn']
+        total_tp, total_fp, total_fn = self.total["tp"], self.total["fp"], self.total["fn"]
         total_precision = total_tp / (total_tp + total_fp + 1e-16)
         total_recall = total_tp / (total_tp + total_fn + 1e-16)
-        total_detection_rate = self.total['pred'] / max(self.total['gt'], 1)
+        total_detection_rate = self.total["pred"] / max(self.total["gt"], 1)
 
-        metrics['total'] = {
-            'gt': self.total['gt'],
-            'pred': self.total['pred'],
-            'tp': self.total['tp'],
-            'fp': self.total['fp'],
-            'fn': self.total['fn'],
-            'precision': float(total_precision),
-            'recall': float(total_recall),
-            'detection_rate': float(total_detection_rate)
+        metrics["total"] = {
+            "gt": self.total["gt"],
+            "pred": self.total["pred"],
+            "tp": self.total["tp"],
+            "fp": self.total["fp"],
+            "fn": self.total["fn"],
+            "precision": float(total_precision),
+            "recall": float(total_recall),
+            "detection_rate": float(total_detection_rate),
         }
 
         return metrics
