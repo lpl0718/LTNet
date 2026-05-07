@@ -6,8 +6,6 @@ import re
 import types
 from copy import deepcopy
 from pathlib import Path
-from .Addmodule import *
-
 
 import torch
 import torch.nn as nn
@@ -56,6 +54,7 @@ from ultralytics.nn.modules import (
     ImagePoolingAttn,
     Index,
     LRPCHead,
+    PC_Detect,
     Pose,
     RepC3,
     RepConv,
@@ -70,7 +69,6 @@ from ultralytics.nn.modules import (
     YOLOEDetect,
     YOLOESegment,
     v10Detect,
-    PC_Detect,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -96,6 +94,7 @@ from ultralytics.utils.torch_utils import (
     time_sync,
 )
 
+from .Addmodule import *
 
 
 class BaseModel(torch.nn.Module):
@@ -177,7 +176,7 @@ class BaseModel(torch.nn.Module):
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
-  ###################2026/1/9########################
+            ###################2026/1/9########################
             try:
                 if m.input_nums > 1:
                     # input nums more than one
@@ -187,7 +186,7 @@ class BaseModel(torch.nn.Module):
             except AttributeError:
                 # AttributeError: 'Conv' object has no attribute 'input_nums'
                 x = m(x)  # run
-    ####################################################
+            ####################################################
 
             y.append(x if m.i in self.save else None)  # save output
             if visualize:
@@ -297,7 +296,7 @@ class BaseModel(torch.nn.Module):
         self = super()._apply(fn)
         m = self.model[-1]  # Detect()
         if isinstance(
-            m, (Detect,PC_Detect)
+            m, (Detect, PC_Detect)
         ):  # includes all Detect subclasses like Segment, Pose, OBB, WorldDetect, YOLOEDetect, YOLOESegment
             m.stride = fn(m.stride)
             m.anchors = fn(m.anchors)
@@ -404,10 +403,12 @@ class DetectionModel(BaseModel):
         self.inplace = self.yaml.get("inplace", True)
         self.end2end = getattr(self.model[-1], "end2end", False)
 
-##############################################
+        ##############################################
         # Build strides
         m = self.model[-1]  # Detect()
-        if isinstance(m, (Detect,PC_Detect)):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment
+        if isinstance(
+            m, (Detect, PC_Detect)
+        ):  # includes all Detect subclasses like Segment, Pose, OBB, YOLOEDetect, YOLOESegment
             s = 256  # 2x min stride
             m.inplace = self.inplace
 
@@ -1535,10 +1536,6 @@ def parse_model(d, ch, verbose=True):
     ch = [ch]
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
 
-
-
-
-
     base_modules = frozenset(
         {
             Classify,
@@ -1591,7 +1588,6 @@ def parse_model(d, ch, verbose=True):
             CAA,
             ELA,
             ECA,
-
             ELA_DSConv,
             DSConv_ELA,
             ELA_SPDConv,
@@ -1600,7 +1596,6 @@ def parse_model(d, ch, verbose=True):
             HWD_ELA,
             ELA_Conv,
             Conv_ELA,
-
             ECA_DSConv,
             DSConv_ECA,
             ECA_SPDConv,
@@ -1609,7 +1604,6 @@ def parse_model(d, ch, verbose=True):
             HWD_ECA,
             ECA_Conv,
             Conv_ECA,
-
             CA_DSConv,
             DSConv_CA,
             CA_SPDConv,
@@ -1618,7 +1612,6 @@ def parse_model(d, ch, verbose=True):
             HWD_CA,
             CA_Conv,
             Conv_CA,
-
             CAA_DSConv,
             DSConv_CAA,
             CAA_SPDConv,
@@ -1630,10 +1623,6 @@ def parse_model(d, ch, verbose=True):
             DBPD2,
             DBPD3,
             SPDConv2,
-
-
-
-            
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
@@ -1685,11 +1674,6 @@ def parse_model(d, ch, verbose=True):
                 if scale in "mlx":
                     args[3] = True
 
-
-
-
-
-
             if m is A2C2f:
                 legacy = False
                 if scale in "lx":  # for L/X sizes
@@ -1704,22 +1688,18 @@ def parse_model(d, ch, verbose=True):
             if m is HGBlock:
                 args.insert(4, n)  # number of repeats
                 n = 1
- ###################2026/1/12########################
+        ###################2026/1/12########################
         elif m in {FocalModulation}:
-            c2 =ch[f]
+            c2 = ch[f]
             args = [c2, *args]
 
-###################2026/1/12########################
+        ###################2026/1/12########################
 
-
-    ###################2026/1/16########################
+        ###################2026/1/16########################
         elif m in {PnPNystraAttention}:
-            c2 =ch[f]
+            c2 = ch[f]
             args = [ch[f]]
-###################2026/1/16########################
-
-
-
+        ###################2026/1/16########################
 
         elif m is ResNetLayer:
             c2 = args[1] if args[3] else args[1] * 4
@@ -1728,7 +1708,7 @@ def parse_model(d, ch, verbose=True):
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
         elif m in frozenset(
-            {Detect, WorldDetect, YOLOEDetect, Segment, YOLOESegment, Pose, OBB, ImagePoolingAttn, v10Detect,PC_Detect}
+            {Detect, WorldDetect, YOLOEDetect, Segment, YOLOESegment, Pose, OBB, ImagePoolingAttn, v10Detect, PC_Detect}
         ):
             args.append([ch[x] for x in f])
             if m is Segment or m is YOLOESegment:
@@ -1754,10 +1734,6 @@ def parse_model(d, ch, verbose=True):
         t = str(m)[8:-2].replace("__main__.", "")  # module type
         m_.np = sum(x.numel() for x in m_.parameters())  # number params
         m_.i, m_.f, m_.type = i, f, t  # attach index, 'from' index, type
-
-
-
-
 
         if verbose:
             LOGGER.info(f"{i:>3}{f!s:>20}{n_:>3}{m_.np:10.0f}  {t:<45}{args!s:<30}")  # print
@@ -1831,7 +1807,7 @@ def guess_model_task(model):
         if m == "obb":
             return "obb"
         else:
-            return 'detect'
+            return "detect"
 
     # Guess from model cfg
     if isinstance(model, dict):

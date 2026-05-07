@@ -1812,7 +1812,6 @@ class Albumentations:
             ImportError: If the Albumentations package is not installed.
             Exception: For any other errors during initialization.
         """
-        
         self.p = p
         self.transform = None
         prefix = colorstr("albumentations: ")
