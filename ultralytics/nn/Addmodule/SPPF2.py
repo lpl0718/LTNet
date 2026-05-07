@@ -63,6 +63,7 @@ class Conv(nn.Module):
         """
         return self.act(self.conv(x))
 
+
 class SPPF2(nn.Module):
     """Spatial Pyramid Pooling - Fast (SPPF) layer for YOLOv5 by Glenn Jocher."""
 

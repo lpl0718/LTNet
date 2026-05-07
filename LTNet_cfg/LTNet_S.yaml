@@ -12,15 +12,14 @@ scales: # model compound scaling constants, i.e. 'model=yolo11n.yaml' will call 
 backbone:
   # [from, repeats, module, args]
   - [-1, 1, Conv, [32, 3, 1]]
-  - [-1, 1, SPDConv, [96,1]]
+  - [-1, 1, SPDConv, [96, 1]]
   - [-1, 1, DBPD3, [288]]
   - [-1, 2, C3k2, [192, True]] #3
   - [-1, 1, DBPD3, [576]]
-  - [-1, 2, C3k2_MLLABlock2, [384,1, True]] #5
+  - [-1, 2, C3k2_MLLABlock2, [384, 1, True]] #5
   - [-1, 1, Conv, [384, 3, 2]]
-  - [-1, 2, C3k2_MLLABlock2, [384,1,True]]  #7
+  - [-1, 2, C3k2_MLLABlock2, [384, 1, True]] #7
   - [-1, 1, SPPF2, [384, 5]] #8
-
 
 # YOLO11n head
 head:
@@ -28,16 +27,13 @@ head:
   - [[-1, 5], 1, Concat, [1]]
   - [-1, 2, C3k2, [96, False]] #11
 
+  - [3, 1, ECA_HWD, [192, 3, 2, 2]]
 
-  - [ 3, 1, ECA_HWD, [192, 3, 2, 2]]
+  - [[-1, 11, 5], 1, Concat, [1]]
+  - [-1, 2, C3k2, [256, False]] #14
 
-
-  - [[-1,11, 5], 1, Concat, [1]]
-  - [-1, 2, C3k2, [256, False ] ] #14
-
-  - [ -1, 1, Conv, [192, 3, 2]]
+  - [-1, 1, Conv, [192, 3, 2]]
   - [[-1, 8], 1, Concat, [1]]
-  - [-1, 2, C3k2_MLLABlock2, [192, 1,True ] ] #17
+  - [-1, 2, C3k2_MLLABlock2, [192, 1, True]] #17
 
-
-  - [[14,17], 1, Detect, [nc]] # Detect(P3, P4)
+  - [[14, 17], 1, Detect, [nc]] # Detect(P3, P4)

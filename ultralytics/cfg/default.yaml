@@ -99,8 +99,6 @@ warmup_epochs: 3.0 # (float) warmup epochs (fractions allowed)
 warmup_momentum: 0.8 # (float) initial momentum during warmup
 warmup_bias_lr: 0.1 # (float) bias learning rate during warmup
 
-
-
 #loss1 NWDLoss
 
 # box: 50 # (float) box loss gain
