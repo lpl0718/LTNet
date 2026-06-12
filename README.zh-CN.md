@@ -1,5 +1,5 @@
 **简体中文** | [English](README.md)
-# [LTNet: 一种轻量且高精度的 PCB 表面缺陷检测网络](LTNet.md)
+# [LTNet：面向 PCB 自动化生产微小表面缺陷检测的轻量高性能网络](LTNet.md)
 
 ## 📌 重要使用说明
 **本模型同样适用于其他中小规模、无遮挡的极小目标检测场景。**
@@ -43,6 +43,10 @@ mim install mmcv
 **数据集2：DeepPCB 上海交通大学图像处理与模式识别研究所提供**  
 **具体数据集划分与增强策略↓↓↓**  
 `https://pan.quark.cn/s/4929ce1e571b`
+
+**数据集3: DsPCBSD+** 
+`https://figshare.com/articles/dataset/DsPCBSD_/24970329?file=44069552`
+
 > **⚠️ 重要提示**
 >  由于数据集的原因，DeepPCB训练时请务必使用`scale=0`关闭这项数据增强，这可能是部分对比模型性能不佳的原因.
 

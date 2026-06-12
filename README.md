@@ -1,5 +1,5 @@
 [简体中文](README.zh-CN.md) | **English**
-# [LTNet: A Lightweight and High-Precision Network for PCB Surface Defect Detection](LTNet.md)
+# [LTNet: A Lightweight High-Performance Network for Coping with Tiny Surface Defect Inspection in Automated PCB Manufacturing](LTNet.md)
 
 ## 📌 Important Usage Notes
 **This model is also suitable for other small-to-medium scale, unobstructed tiny object detection scenarios.**
@@ -41,5 +41,9 @@ mim install mmcv
 **Dataset 2: DeepPCB provided by Shanghai Jiao Tong University Institute of Image Processing and Pattern Recognition**  
 **Specific dataset splits and augmentation strategies ↓↓↓**  
 `https://pan.quark.cn/s/4929ce1e571b`
+
+**Dataset 3: DsPCBSD+**  
+`https://figshare.com/articles/dataset/DsPCBSD_/24970329?file=44069552`
+
 > **⚠️ Important Note**
 > When training with the DeepPCB dataset, please ensure to use `scale=0`, which is the direct cause of poor training results for most models.
