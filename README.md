@@ -1,5 +1,5 @@
 [简体中文](README.zh-CN.md) | **English**
-# [LTNet: A Lightweight High-Performance Network for Coping with Tiny Surface Defect Inspection in Automated PCB Manufacturing](LTNet.md)
+# [LTNet: Lightweight Tiny-Defect Detection for Intelligent PCB Manufacturing](LTNet.md)
 
 ## 📌 Important Usage Notes
 **This model is also suitable for other small-to-medium scale, unobstructed tiny object detection scenarios.**
